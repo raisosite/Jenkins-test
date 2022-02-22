@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Jenkins_test
 {
@@ -6,7 +6,8 @@ namespace Jenkins_test
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine(".NET Jenkins test!");
+            Console.WriteLine("Hello World Rayson!");
         }
     }
 }
