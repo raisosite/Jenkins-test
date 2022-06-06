@@ -187,28 +187,27 @@ pipeline {
             steps {
                 script {
                     String body = sessionResponse
-                    body = """{
-                            "filters": {
-                                "courtHierarchy": [
-                                    "10th Circuit"
-                                ]     
-                            },
-                            "request": {
-                                "entityId": "{{exp-leigh}}",
-                                "itemsPerPage": 25,
-                                "startIndex": 0,
-                                "sortType": "title",
-                                "sortOrder": "asc"
-                            }
-                        }"""
+                    body =  """{
+                                    "filters": {
+                                        "courtHierarchy": [
+                                            "10th Circuit"
+                                        ]     
+                                    },
+                                    "request": {
+                                        "entityId": "{{exp-leigh}}",
+                                        "itemsPerPage": 25,
+                                        "startIndex": 0,
+                                        "sortType": "title",
+                                        "sortOrder": "asc"
+                                    }
+                                }"""
 
                     println(body)
 
                     def response =
                             httpRequest consoleLogResponseBody: true, 
-                                    httpMode: 'POST',
-                                    url: "http://localhost:8080/dockets",
-                                    requestBody: body,
+                                    httpMode: 'GET',
+                                    url: "https://api.publicapis.org/entries",                                    
                                     customHeaders: [
                                             [name: 'Accept', value: 'application/json'],
                                             [name: 'Content-Type', value: 'application/json']
