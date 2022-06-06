@@ -15,6 +15,11 @@ import groovy.json.JsonSlurper
     String password = "1234" // replace this
     String auth = "1234" //replace this
 
+    List<Dictionary<String,String>> customHeaders = [ 
+        { "Accept" , "application/json" },
+        { "Content-Type", "application/json"} 
+    ]
+
     // variables set after env is defined
     String briefUrl = ""
 
@@ -209,8 +214,8 @@ pipeline {
                                     httpMode: 'GET',
                                     url: "https://api.publicapis.org/entries",                                    
                                     customHeaders: [
-                                            [name: 'Accept', value: 'application/json'],
-                                            [name: 'Content-Type', value: 'application/json']
+                                            [customHeaders[0]],
+                                            [customHeaders[1]]
                                     ]
 
                     println('Status: '+response.status)
