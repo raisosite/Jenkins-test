@@ -205,7 +205,8 @@ pipeline {
                     println(body)
 
                     def response =
-                            httpRequest httpMode: 'POST',
+                            httpRequest consoleLogResponseBody: true, 
+                                    httpMode: 'POST',
                                     url: "http://localhost:8080/dockets",
                                     requestBody: body,
                                     customHeaders: [
