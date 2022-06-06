@@ -215,6 +215,13 @@ pipeline {
 
                     println('Status: '+response.status)
                     println('Response: '+response.content)
+
+                    def jsonSlurper = new JsonSlurper()
+                    def result = jsonSlurper.parseText(response.content)
+
+                    println(result.count)
+                    println(result.entries[3])
+
                 }
             }
         }
