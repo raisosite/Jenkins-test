@@ -202,6 +202,8 @@ pipeline {
                             }
                         }"""
 
+                    println(body)
+
                     def response =
                             httpRequest httpMode: 'POST',
                                     url: "http://localhost:8080/dockets",
