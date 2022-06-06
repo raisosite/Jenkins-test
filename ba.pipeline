@@ -1,0 +1,343 @@
+#!groovy
+import groovy.json.JsonSlurper
+
+//region Http Variables
+
+    String xlnRequest = "'<rt:requestToken xmlns:rt=http://services.lexisnexis.com/xmlschema/request-token/1><transactionID>52f611cc-9ba8-4f8a-8f12-e7831a6f02dc</transactionID><sequence>1.1</sequence><featurePermID /><clientID /><cpmFeatureCode>0</cpmFeatureCode><billBackString descriptionPermId=\"\">-None-</billBackString><contextualFeaturePermID /><masterFeatureContext /><isMandatoryBillbackEnforced>false</isMandatoryBillbackEnforced></rt:requestToken>'"
+    String tokenUrl = "http://cdc1c-i-services.route53.lexis.com/identity/accesstoken"
+    String sso = "sso"
+    String application = "application"
+    String applicationResponse = "<ns2:applicationToken xmlns:ns2=http://services.lexisnexis.com/xmlschema/application-token/1><applicationPermID>1000202</applicationPermID><issued>2021-08-13T15:26:39.775Z</issued><signature>v1-3631ca05aaecbc7b0ea914015bf95cda</signature></ns2:applicationToken>"
+    String session = "session"
+    String sessionResponse = "" // this will return from sso call
+    String applicationPermId = "1234" // replace this
+    String userId = "1234" // replace this
+    String password = "1234" // replace this
+    String auth = "1234" //replace this
+
+    // variables set after env is defined
+    String briefUrl = ""
+
+//endregion
+
+//region Parameter Variables
+
+    // these will set the environment options when starting the pipeline
+    List envList = ["\"Select:selected\"","\"cert\"","\"dev\"","\"prod\""]
+    List certList = ["\"Select:selected\"","\"cdc1c\"","\"cdc2c\"","\"cdc7c\""]
+    List devList = ["\"Select:selected\"","\"ddc1c\""]
+    List prodList = ["\"Select:selected\"","\"pdc1c\""]
+
+    String environmentScript = buildScript(envList)
+    String groupScript = populateItems(certList, devList, prodList)
+    String[] parameterDescriptions = ["Select target environment" , "Select AssetGroup"]
+    String[] parameterFileNames = ["PlaintiffFile1.docx", "PlaintiffFile2.docx", "PlaintiffFile3.docx", "DefendantFile1.docx", "DefendantFile2.docx", "DefendantFile3.docx"]
+    String[] parameterFileDescriptions = ["Brief file 1 ( must be: Plaintiff )" , "Brief file 2 ( must be: Plaintiff )", "Brief file 3 ( must be: Plaintiff )", "Brief file 4 ( must be: Defendant )", "Brief file 5 ( must be: Defendant )", "Brief file 6 ( must be: Defendant )"]
+
+    // Methods to build groovy scripts to populate data
+    String buildScript(List values){
+        return "return $values"
+    }
+
+    // Method to create script for reactive choice parameter
+    String populateItems(List certList, List devList, List prodList){
+        return """if(Env.equals('dev')){
+            return $devList
+         }
+         else if(Env.equals('prod')){
+            return $prodList
+         }else{
+            return $certList
+         }
+         """
+    }
+
+    //Method to return url based on environment
+    String getUrlStringByEnv() {
+        String briefUrlProd = "https://pdc1c-la-fp-briefanalyzer.route53.lexis.com"
+        String briefUrlCert = "https://cdc7c-la-fp-briefanalyzer.route53.lexis.com"
+        String briefUploadPath = "f/ba/upload/file"
+        switch (params.AssetGroup) {
+            case 'cdc7' || 'cdc1c' || 'cdc2c':
+                return "${briefUrlCert}/${briefUploadPath}"
+            case 'pdc1c':
+                return "${briefUrlProd}/${briefUploadPath}"
+            default:
+                return "${briefUrlCert}/${briefUploadPath}"
+        }
+    }
+//endregion
+
+//region Pipeline Properties
+    properties([
+            parameters([
+                    [
+                            $class: 'ChoiceParameter',
+                            choiceType: 'PT_SINGLE_SELECT',
+                            description: parameterDescriptions[0],
+                            name: 'Env',
+                            script: [$class: 'GroovyScript', fallbackScript: [classpath: [], sandbox: false, script: 'return ["ERROR"]'], script: [classpath: [], sandbox: false, script:  environmentScript]]
+                    ],
+                    [
+                            $class: 'CascadeChoiceParameter',
+                            choiceType: 'PT_RADIO',
+                            description: parameterDescriptions[1],
+                            name: 'AssetGroup', referencedParameters: 'Env',
+                            script: [$class: 'GroovyScript', fallbackScript: [classpath: [], sandbox: false, script: 'return ["error"]'], script: [classpath: [], sandbox: false, script: groupScript]]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[0],
+                            name: parameterFileNames[0]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[1],
+                            name: parameterFileNames[1]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[2],
+                            name: parameterFileNames[2]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[3],
+                            name: parameterFileNames[3]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[4],
+                            name: parameterFileNames[4]
+                    ],
+                    [
+                            $class: 'FileParameterDefinition',
+                            description: parameterFileDescriptions[5],
+                            name: parameterFileNames[5]
+                    ]
+            ])
+    ])
+//endregion
+
+pipeline {
+    agent {
+        node {
+            label 'DockerAgent'
+        }
+    }
+    stages{
+        stage('setup'){
+            steps {
+                script {
+                    briefUrl = getUrlStringByEnv()
+                    println("briefUrl ==> $briefUrl")
+                }
+            }
+        }
+        stage('application') {
+            steps {
+                script {
+                    echo("${WORKSPACE}")
+
+                    def content = readFile "${WORKSPACE}/src/main/resources/BADocs/Brief1.docx"
+                    echo("content is => ${content}")
+
+                    println(params.AssetGroup)
+                    String body = """
+                        <CreateApplicationTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1>
+                           <applicationPermId>${applicationPermId}</applicationPermId>
+                        </CreateApplicationTokenRequest>
+                    """
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                            url: "${tokenUrl}/${application}",
+                            requestBody: body,
+                            customHeaders: [
+                                    [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                    [name: 'Authorization', value: "Basic ${auth}"],
+                                    [name: 'Content-Type', value: 'application/xml']
+                            ]
+
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('sso') {
+            steps {
+                script {
+                    String body = """
+                        <CreateSSOTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1 xmlns:xsi=http://www.w3.org/2001/XMLSchema-instance xmlns:xsd=http://www.w3.org/2001/XMLSchema>
+                            <userId>${userId}</userId>
+                            <password>${password}</password>
+                        </CreateSSOTokenRequest>
+                    """
+
+                    def response =
+                        httpRequest  httpMode: 'POST',
+                        url: "${tokenUrl}/${sso}",
+                        requestBody: body,
+                        customHeaders: [
+                                [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                [name: 'Authorization', value: "Basic ${auth}"],
+                                [name: 'Content-Type', value: 'application/x-wamssotoken+xml;version=1'],
+                                [name: 'Accept-Type', value: 'application/x-wamssotoken+xml;version=1']
+                        ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('session') {
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                            url: "${tokenUrl}/${session}",
+                            requestBody: body,
+                            customHeaders: [
+                                    [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                    [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                    [name: 'Authorization', value: "Basic ${auth}"],
+                                    [name: 'Content-Type', value: 'application/xml']
+                            ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 1 - plaintiff'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 2 - plaintiff'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 3 - plaintiff'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 4 - defendant'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 5 - defendant'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+        stage('single brief upload 6 - defendant'){
+            steps {
+                script {
+                    String body = sessionResponse
+
+                    def response =
+                            httpRequest httpMode: 'POST',
+                                    url: briefUrl,
+                                    requestBody: body,
+                                    customHeaders: [
+                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
+                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
+                                            [name: 'Authorization', value: "Basic ${auth}"],
+                                            [name: 'Content-Type', value: 'application/xml']
+                                    ]
+
+                    println('Status: '+response.status)
+                    println('Response: '+response.content)
+                }
+            }
+        }
+    }
+}
