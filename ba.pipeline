@@ -187,16 +187,28 @@ pipeline {
             steps {
                 script {
                     String body = sessionResponse
+                    body = """ {
+                            "filters": {
+                                "courtHierarchy": [
+                                    "10th Circuit"
+                                ]     
+                            },
+                            "request": {
+                                "entityId": "{{exp-leigh}}",
+                                "itemsPerPage": 25,
+                                "startIndex": 0,
+                                "sortType": "title",
+                                "sortOrder": "asc"
+                            }
+                        } """
 
                     def response =
                             httpRequest httpMode: 'POST',
-                                    url: briefUrl,
+                                    url: "http://cdc7c-entityanalyticsengine-api.route53.lexis.com/dockets",
                                     requestBody: body,
                                     customHeaders: [
                                             [name: 'Accept', value: 'application/json'],
-                                            [name: 'Content-Type', value: 'application/json'],
-                                            [name: 'Brief-Doc-Type', value: 'Plaintiff'],
-                                            [name: 'X-File-Name', value: 'Brief2.docx']
+                                            [name: 'Content-Type', value: 'application/json']
                                     ]
 
                     println('Status: '+response.status)
