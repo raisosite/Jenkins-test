@@ -187,7 +187,7 @@ pipeline {
             steps {
                 script {
                     String body = sessionResponse
-                    body = """ {
+                    body = """{
                             "filters": {
                                 "courtHierarchy": [
                                     "10th Circuit"
@@ -200,11 +200,11 @@ pipeline {
                                 "sortType": "title",
                                 "sortOrder": "asc"
                             }
-                        } """
+                        }"""
 
                     def response =
                             httpRequest httpMode: 'POST',
-                                    url: "http://cdc7c-entityanalyticsengine-api.route53.lexis.com/dockets",
+                                    url: "http://localhost:8080/dockets",
                                     requestBody: body,
                                     customHeaders: [
                                             [name: 'Accept', value: 'application/json'],
