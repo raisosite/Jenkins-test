@@ -23,10 +23,10 @@ import groovy.json.JsonSlurper
 //region Parameter Variables
 
     // these will set the environment options when starting the pipeline
-    List envList = ["\"Select:selected\"","\"cert\"","\"dev\"","\"prod\""]
-    List certList = ["\"Select:selected\"","\"cdc1c\"","\"cdc2c\"","\"cdc7c\""]
-    List devList = ["\"Select:selected\"","\"ddc1c\""]
-    List prodList = ["\"Select:selected\"","\"pdc1c\""]
+    List envList = ["\"cert\"","\"dev\"","\"prod\""]
+    List certList = ["\"cdc1c\"","\"cdc2c\"","\"cdc7c\""]
+    List devList = ["\"ddc1c\""]
+    List prodList = ["\"pdc1c\""]
 
     String environmentScript = buildScript(envList)
     String groupScript = populateItems(certList, devList, prodList)
@@ -55,7 +55,7 @@ import groovy.json.JsonSlurper
     //Method to return url based on environment
     String getUrlStringByEnv() {
         String briefUrlProd = "https://pdc1c-la-fp-briefanalyzer.route53.lexis.com"
-        String briefUrlCert = "https://cdc7c-la-fp-briefanalyzer.route53.lexis.com"
+        String briefUrlCert = "http://localhost:51953" //"https://cdc7c-la-fp-briefanalyzer.route53.lexis.com"
         String briefUploadPath = "f/ba/upload/file"
         switch (params.AssetGroup) {
             case 'cdc7' || 'cdc1c' || 'cdc2c':
@@ -84,36 +84,6 @@ import groovy.json.JsonSlurper
                             description: parameterDescriptions[1],
                             name: 'AssetGroup', referencedParameters: 'Env',
                             script: [$class: 'GroovyScript', fallbackScript: [classpath: [], sandbox: false, script: 'return ["error"]'], script: [classpath: [], sandbox: false, script: groupScript]]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[0],
-                            name: parameterFileNames[0]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[1],
-                            name: parameterFileNames[1]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[2],
-                            name: parameterFileNames[2]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[3],
-                            name: parameterFileNames[3]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[4],
-                            name: parameterFileNames[4]
-                    ],
-                    [
-                            $class: 'FileParameterDefinition',
-                            description: parameterFileDescriptions[5],
-                            name: parameterFileNames[5]
                     ]
             ])
     ])
@@ -134,85 +104,85 @@ pipeline {
                 }
             }
         }
-        stage('application') {
-            steps {
-                script {
-                    echo("${WORKSPACE}")
+        // stage('application') {
+        //     steps {
+        //         script {
+        //             echo("${WORKSPACE}")
 
-                    def content = readFile "${WORKSPACE}/src/main/resources/BADocs/Brief1.docx"
-                    echo("content is => ${content}")
+        //             def content = readFile "${WORKSPACE}/src/main/resources/BADocs/Brief1.docx"
+        //             echo("content is => ${content}")
 
-                    println(params.AssetGroup)
-                    String body = """
-                        <CreateApplicationTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1>
-                           <applicationPermId>${applicationPermId}</applicationPermId>
-                        </CreateApplicationTokenRequest>
-                    """
+        //             println(params.AssetGroup)
+        //             String body = """
+        //                 <CreateApplicationTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1>
+        //                    <applicationPermId>${applicationPermId}</applicationPermId>
+        //                 </CreateApplicationTokenRequest>
+        //             """
 
-                    def response =
-                            httpRequest httpMode: 'POST',
-                            url: "${tokenUrl}/${application}",
-                            requestBody: body,
-                            customHeaders: [
-                                    [name: 'X-LN-Request', value: "${xlnRequest}"],
-                                    [name: 'Authorization', value: "Basic ${auth}"],
-                                    [name: 'Content-Type', value: 'application/xml']
-                            ]
+        //             def response =
+        //                     httpRequest httpMode: 'POST',
+        //                     url: "${tokenUrl}/${application}",
+        //                     requestBody: body,
+        //                     customHeaders: [
+        //                             [name: 'X-LN-Request', value: "${xlnRequest}"],
+        //                             [name: 'Authorization', value: "Basic ${auth}"],
+        //                             [name: 'Content-Type', value: 'application/xml']
+        //                     ]
 
 
-                    println('Status: '+response.status)
-                    println('Response: '+response.content)
-                }
-            }
-        }
-        stage('sso') {
-            steps {
-                script {
-                    String body = """
-                        <CreateSSOTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1 xmlns:xsi=http://www.w3.org/2001/XMLSchema-instance xmlns:xsd=http://www.w3.org/2001/XMLSchema>
-                            <userId>${userId}</userId>
-                            <password>${password}</password>
-                        </CreateSSOTokenRequest>
-                    """
+        //             println('Status: '+response.status)
+        //             println('Response: '+response.content)
+        //         }
+        //     }
+        // }
+        // stage('sso') {
+        //     steps {
+        //         script {
+        //             String body = """
+        //                 <CreateSSOTokenRequest xmlns=http://services.lexisnexis.com/xmlschemas/identity/accesstoken/1 xmlns:xsi=http://www.w3.org/2001/XMLSchema-instance xmlns:xsd=http://www.w3.org/2001/XMLSchema>
+        //                     <userId>${userId}</userId>
+        //                     <password>${password}</password>
+        //                 </CreateSSOTokenRequest>
+        //             """
 
-                    def response =
-                        httpRequest  httpMode: 'POST',
-                        url: "${tokenUrl}/${sso}",
-                        requestBody: body,
-                        customHeaders: [
-                                [name: 'X-LN-Request', value: "${xlnRequest}"],
-                                [name: 'X-LN-Application', value: "${applicationResponse}"],
-                                [name: 'Authorization', value: "Basic ${auth}"],
-                                [name: 'Content-Type', value: 'application/x-wamssotoken+xml;version=1'],
-                                [name: 'Accept-Type', value: 'application/x-wamssotoken+xml;version=1']
-                        ]
+        //             def response =
+        //                 httpRequest  httpMode: 'POST',
+        //                 url: "${tokenUrl}/${sso}",
+        //                 requestBody: body,
+        //                 customHeaders: [
+        //                         [name: 'X-LN-Request', value: "${xlnRequest}"],
+        //                         [name: 'X-LN-Application', value: "${applicationResponse}"],
+        //                         [name: 'Authorization', value: "Basic ${auth}"],
+        //                         [name: 'Content-Type', value: 'application/x-wamssotoken+xml;version=1'],
+        //                         [name: 'Accept-Type', value: 'application/x-wamssotoken+xml;version=1']
+        //                 ]
 
-                    println('Status: '+response.status)
-                    println('Response: '+response.content)
-                }
-            }
-        }
-        stage('session') {
-            steps {
-                script {
-                    String body = sessionResponse
+        //             println('Status: '+response.status)
+        //             println('Response: '+response.content)
+        //         }
+        //     }
+        // }
+        // stage('session') {
+        //     steps {
+        //         script {
+        //             String body = sessionResponse
 
-                    def response =
-                            httpRequest httpMode: 'POST',
-                            url: "${tokenUrl}/${session}",
-                            requestBody: body,
-                            customHeaders: [
-                                    [name: 'X-LN-Request', value: "${xlnRequest}"],
-                                    [name: 'X-LN-Application', value: "${applicationResponse}"],
-                                    [name: 'Authorization', value: "Basic ${auth}"],
-                                    [name: 'Content-Type', value: 'application/xml']
-                            ]
+        //             def response =
+        //                     httpRequest httpMode: 'POST',
+        //                     url: "${tokenUrl}/${session}",
+        //                     requestBody: body,
+        //                     customHeaders: [
+        //                             [name: 'X-LN-Request', value: "${xlnRequest}"],
+        //                             [name: 'X-LN-Application', value: "${applicationResponse}"],
+        //                             [name: 'Authorization', value: "Basic ${auth}"],
+        //                             [name: 'Content-Type', value: 'application/xml']
+        //                     ]
 
-                    println('Status: '+response.status)
-                    println('Response: '+response.content)
-                }
-            }
-        }
+        //             println('Status: '+response.status)
+        //             println('Response: '+response.content)
+        //         }
+        //     }
+        // }
         stage('single brief upload 1 - plaintiff'){
             steps {
                 script {
@@ -223,10 +193,10 @@ pipeline {
                                     url: briefUrl,
                                     requestBody: body,
                                     customHeaders: [
-                                            [name: 'X-LN-Request', value: "${xlnRequest}"],
-                                            [name: 'X-LN-Application', value: "${applicationResponse}"],
-                                            [name: 'Authorization', value: "Basic ${auth}"],
-                                            [name: 'Content-Type', value: 'application/xml']
+                                            [name: 'Accept', value: 'application/json'],
+                                            [name: 'Content-Type', value: 'application/json'],
+                                            [name: 'Brief-Doc-Type', value: 'Plaintiff'],
+                                            [name: 'X-File-Name', value: 'Brief2.docx']
                                     ]
 
                     println('Status: '+response.status)
